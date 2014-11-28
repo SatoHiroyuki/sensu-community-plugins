@@ -100,8 +100,26 @@ class CheckJson < Sensu::Plugin::Check::CLI
     end
     res = http.request(req)
 
-    case res.code
-    when /^2/
+   case res
+    when Net::HTTPSuccess then
+      if json_valid?(res.body)
+        if (config[:key] != nil && config[:value] != nil)
+          json = JSON.parse(res.body)
+          if json[config[:key]].to_s == config[:value].to_s
+            ok "Valid JSON and key present and correct"
+          else
+            critical "JSON key check failed"
+          end
+        else
+          ok "Valid JSON returned"
+        end
+      else
+        critical "Response contains invalid JSON"
+      end
+    when Net::HTTPRedirection then
+      location = res['location']
+      req = Net::HTTP::Get.new(location)
+      res = http.request(req)
       if json_valid?(res.body)
         if (config[:key] != nil && config[:value] != nil)
           json = JSON.parse(res.body)
@@ -119,5 +137,4 @@ class CheckJson < Sensu::Plugin::Check::CLI
     else
       critical res.code
     end
-  end
 end
